@@ -10,7 +10,9 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 public class KafkaESIndexerProcess {
     private static final Logger logger = LoggerFactory.getLogger(KafkaESIndexerProcess.class);
     public static void main(String[] args) throws Exception {
+
         logger.info("Starting KafkaESIndexerProcess  ");
+
         ClassPathXmlApplicationContext indexerContext = new ClassPathXmlApplicationContext("spring/kafka-es-context-public.xml");
         indexerContext.registerShutdownHook();
 

@@ -12,7 +12,7 @@
 
     <context:component-scan base-package="org.elasticsearch.kafka.indexer.service"/>
     <context:property-placeholder
-            location="file:${config.dir}/kafka-es-indexer.properties"
+            location="file:/home/jfd/soft/kafka-elasticsearch-consumer/src/main/resources/config/kafka-es-indexer.properties"
     	    ignore-resource-not-found="true" />
 
     <bean id="messageHandler"
@@ -22,6 +22,6 @@
 	  
     <bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
             p:messageHandler-ref="messageHandler"
-    	    p:consumerStartOptionsConfig="${config.dir}/kafka-es-indexer-start-options.config"/>
+    	    p:consumerStartOptionsConfig="/home/jfd/soft/kafka-elasticsearch-consumer/src/main/resources/config/kafka-es-indexer-start-options.config"/>
 
 </beans>

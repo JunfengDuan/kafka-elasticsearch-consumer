@@ -1,12 +1,7 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -18,6 +13,7 @@ import javax.annotation.PreDestroy;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.elasticsearch.kafka.indexer.service.IMessageHandler;
@@ -26,6 +22,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * @author marinapopova
@@ -36,8 +34,8 @@ public class ConsumerManager {
     private static final Logger logger = LoggerFactory.getLogger(ConsumerManager.class);
     private static final String KAFKA_CONSUMER_THREAD_NAME_FORMAT = "kafka-elasticsearch-consumer-thread-%d";
 
-    @Value("${topic:testTopic}")
-    private String kafkaTopic;
+//    @Value("${topic:testTopic}")
+//    private String kafkaTopic;
     @Value("${consumerGroupName:kafka-elasticsearch-consumer}")
     private String consumerGroupName;
     @Value("${consumerInstanceName:instance1}")
@@ -58,21 +56,25 @@ public class ConsumerManager {
     @Value("${isPerfReportingEnabled:false}")
     private boolean isPerfReportingEnabled;
 
-    @Value("${kafka.consumer.pool.count:3}")
-    private int kafkaConsumerPoolCount;
+//    @Value("${kafka.consumer.pool.count:3}")
+//    private int kafkaConsumerPoolCount;
 
     private String consumerStartOptionsConfig;
     private IMessageHandler messageHandler;
 
     private ExecutorService consumersThreadPool = null;
     private List<ConsumerWorker> consumers = new ArrayList<>();
+
     private Properties kafkaProperties;
+    private static KafkaConsumer<String, String> kafkaConsumer;
+    private static Map<String, List<PartitionInfo> > topicInfo = new HashMap<>();
+    private static List<String> kafkaTopics = new ArrayList<>();
+
     private Map<Integer, ConsumerStartOption> consumerStartOptions;
 
     private AtomicBoolean running = new AtomicBoolean(false);
 
-    public ConsumerManager() {
-    }
+    public ConsumerManager() {}
 
     public IMessageHandler getMessageHandler() {
         return messageHandler;
@@ -97,25 +99,43 @@ public class ConsumerManager {
         kafkaProperties.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, consumerSessionTimeoutMs);
         kafkaProperties.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, maxPartitionFetchBytes);
         kafkaProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
         // TODO make a dynamic property determined from the mockedKafkaCluster metadata
-        int consumerPoolCount = kafkaConsumerPoolCount;
+//        int consumerPoolCount = kafkaConsumerPoolCount;
         consumerStartOptions = ConsumerStartOption.fromFile(new File(consumerStartOptionsConfig));
         determineOffsetForAllPartitionsAndSeek();
-        initConsumers(consumerPoolCount);
+        initConsumers();
     }
 
-    private void initConsumers(int consumerPoolCount) {
-        logger.info("initConsumers() started, consumerPoolCount={}", consumerPoolCount);
+    private void initConsumers() {
+        logger.info("initConsumers() started");
+        kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
+        topicInfo = kafkaConsumer.listTopics();
+
+        kafkaTopics.addAll(topicInfo.keySet());
+        logger.info("kafkaTopics :{}",kafkaTopics);
+
+        List<List<PartitionInfo>> list = new ArrayList<>(Collections.unmodifiableCollection(topicInfo.values()));
+        List<PartitionInfo> partitionInfoList = list.stream().flatMap(List :: stream).filter(p -> !p.topic().startsWith("_")).collect(toList());
+        Long partitions = partitionInfoList.stream().map(part -> part.partition()).count();
+        int numOfPartitions = Math.max(Integer.parseInt(partitions.toString()),1);
+
         consumers = new ArrayList<>();
         ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(KAFKA_CONSUMER_THREAD_NAME_FORMAT).build();
-        consumersThreadPool = Executors.newFixedThreadPool(consumerPoolCount, threadFactory);
+        consumersThreadPool = Executors.newFixedThreadPool(numOfPartitions, threadFactory);
 
-        for (int consumerNumber = 0; consumerNumber < consumerPoolCount; consumerNumber++) {
+        partitionInfoList.forEach(partitionInfo -> {
+            ConsumerWorker consumer = new ConsumerWorker(
+                    partitionInfo.partition(), consumerInstanceName, partitionInfo.topic(), kafkaConsumer, kafkaPollIntervalMs, messageHandler);
+            consumers.add(consumer);
+            consumersThreadPool.submit(consumer);
+        });
+        /*for (int consumerNumber = 0; consumerNumber < consumerPoolCount; consumerNumber++) {
             ConsumerWorker consumer = new ConsumerWorker(
                     consumerNumber, consumerInstanceName, kafkaTopic, kafkaProperties, kafkaPollIntervalMs, messageHandler);
             consumers.add(consumer);
             consumersThreadPool.submit(consumer);
-        }
+        }*/
     }
 
     private void shutdownConsumers() {
@@ -146,7 +166,7 @@ public class ConsumerManager {
 
     private void determineOffsetForAllPartitionsAndSeek() {
         KafkaConsumer consumer = new KafkaConsumer<>(kafkaProperties);
-        consumer.subscribe(Arrays.asList(kafkaTopic));
+        consumer.subscribe(kafkaTopics);
 
         //Make init poll to get assigned partitions
         consumer.poll(kafkaPollIntervalMs);

@@ -14,7 +14,7 @@ public interface IMessageHandler {
      * @param offset
      * @throws Exception
      */
-    public void addMessageToBatch(String inputMessage) throws Exception;
+    public void addMessageToBatch(String inputMessage, String indexType) throws Exception;
 
     public String transformMessage(String inputMessage, Long offset) throws Exception;
     

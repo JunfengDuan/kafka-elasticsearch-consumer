@@ -23,17 +23,23 @@ public class SimpleMessageHandlerImpl implements IMessageHandler {
 	private ElasticSearchBatchService elasticSearchBatchService = null;
 	@Value("${esIndexName:my_index}")
 	private String indexName;
-	@Value("${esIndexType:varnish}")
-	private String indexType;
+//	@Value("${esIndexType:varnish}")
+	/*private String indexType;
+
+	public SimpleMessageHandlerImpl(){}
+	public SimpleMessageHandlerImpl(String indexType){
+		this.indexType = indexType;
+	}*/
 
 	@Override
+
 	public String transformMessage(String inputMessage, Long offset) throws Exception {
 		// do not do any transformations for this scenario - just return the message as is
 		return inputMessage;
 	}
 
 	@Override
-	public void addMessageToBatch(String inputMessage) throws Exception {
+	public void addMessageToBatch(String inputMessage, String indexType) throws Exception {
 		String eventUUID = null; // we don't need a UUID for this simple scenario
 		String routingValue = null; // we don't need routing for this simple scenario		
 		elasticSearchBatchService.addEventToBulkRequest(

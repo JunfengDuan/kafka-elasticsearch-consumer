@@ -8,13 +8,11 @@ import org.elasticsearch.kafka.indexer.exception.IndexerESNotRecoverableExceptio
 import org.elasticsearch.kafka.indexer.exception.IndexerESRecoverableException;
 import org.elasticsearch.kafka.indexer.service.IMessageHandler;
 import org.elasticsearch.kafka.indexer.service.OffsetLoggingCallbackImpl;
+import org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * @author marinapopova Apr 13, 2016
@@ -23,27 +21,29 @@ public class ConsumerWorker implements Runnable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
 	private IMessageHandler messageHandler;
-	private final KafkaConsumer<String, String> consumer;
+	private KafkaConsumer<String, String> consumer;
 	private final String kafkaTopic;
+//private static List<String> kafkaTopics = new ArrayList<>();
 	private final int consumerId;
 	// interval in MS to poll Kafka brokers for messages, in case there were no
 	// messages during the previous interval
 	private long pollIntervalMs;
 	private OffsetLoggingCallbackImpl offsetLoggingCallback;
 
-	public ConsumerWorker(int consumerId, String consumerInstanceName, String kafkaTopic, Properties kafkaProperties,
+	public ConsumerWorker(int consumerId, String consumerInstanceName, String kafkaTopic, KafkaConsumer consumer,
 			long pollIntervalMs, IMessageHandler messageHandler) {
+		this.consumer = consumer;
 		this.messageHandler = messageHandler;
-		kafkaProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, consumerInstanceName + "-" + consumerId);
+//		kafkaProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, consumerInstanceName + "-" + consumerId);
 
 		this.consumerId = consumerId;
 		this.kafkaTopic = kafkaTopic;
 		this.pollIntervalMs = pollIntervalMs;
-		consumer = new KafkaConsumer<>(kafkaProperties);
+//		consumer = new KafkaConsumer<>(kafkaProperties);
 		offsetLoggingCallback = new OffsetLoggingCallbackImpl();
 		logger.info(
 				"Created ConsumerWorker with properties: consumerId={}, consumerInstanceName={}, kafkaTopic={}, kafkaProperties={}",
-				consumerId, consumerInstanceName, kafkaTopic, kafkaProperties);
+				consumerId, consumerInstanceName, kafkaTopic);
 	}
 
 	@Override
@@ -79,7 +79,7 @@ public class ConsumerWorker implements Runnable {
 
 					try {
 						String processedMessage = messageHandler.transformMessage(record.value(), record.offset());
-						messageHandler.addMessageToBatch(processedMessage);
+						messageHandler.addMessageToBatch(processedMessage,record.topic());
 						partitionOffsetMap.put(record.partition(), record.offset());
 						numProcessedMessages++;
 					} catch (Exception e) {

@@ -6,7 +6,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.elasticsearch.ElasticsearchException;
-import org.elasticsearch.action.ActionWriteResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;

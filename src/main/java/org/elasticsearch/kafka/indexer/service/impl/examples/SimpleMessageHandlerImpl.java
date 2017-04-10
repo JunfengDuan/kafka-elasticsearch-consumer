@@ -39,8 +39,8 @@ public class SimpleMessageHandlerImpl implements IMessageHandler {
 	}
 
 	@Override
-	public void addMessageToBatch(String inputMessage, String indexType) throws Exception {
-		String eventUUID = null; // we don't need a UUID for this simple scenario
+	public void addMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception {
+//		String eventUUID = null; // we don't need a UUID for this simple scenario
 		String routingValue = null; // we don't need routing for this simple scenario		
 		elasticSearchBatchService.addEventToBulkRequest(
 				inputMessage, indexName, indexType, eventUUID, routingValue);

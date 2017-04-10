@@ -22,35 +22,35 @@ public class ConsumerWorker implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
 	private IMessageHandler messageHandler;
 	private KafkaConsumer<String, String> consumer;
-	private final String kafkaTopic;
-//private static List<String> kafkaTopics = new ArrayList<>();
+//	private final String kafkaTopic;
+	private final List<String> kafkaTopics;
 	private final int consumerId;
 	// interval in MS to poll Kafka brokers for messages, in case there were no
 	// messages during the previous interval
 	private long pollIntervalMs;
 	private OffsetLoggingCallbackImpl offsetLoggingCallback;
 
-	public ConsumerWorker(int consumerId, String consumerInstanceName, String kafkaTopic, KafkaConsumer consumer,
+	public ConsumerWorker(int consumerId, String consumerInstanceName, List<String> kafkaTopics, KafkaConsumer consumer,
 			long pollIntervalMs, IMessageHandler messageHandler) {
 		this.consumer = consumer;
 		this.messageHandler = messageHandler;
 //		kafkaProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, consumerInstanceName + "-" + consumerId);
 
 		this.consumerId = consumerId;
-		this.kafkaTopic = kafkaTopic;
+		this.kafkaTopics = kafkaTopics;
 		this.pollIntervalMs = pollIntervalMs;
 //		consumer = new KafkaConsumer<>(kafkaProperties);
 		offsetLoggingCallback = new OffsetLoggingCallbackImpl();
 		logger.info(
 				"Created ConsumerWorker with properties: consumerId={}, consumerInstanceName={}, kafkaTopic={}, kafkaProperties={}",
-				consumerId, consumerInstanceName, kafkaTopic);
+				consumerId, consumerInstanceName, kafkaTopics);
 	}
 
 	@Override
 	public void run() {
 		try {
 			logger.info("Starting ConsumerWorker, consumerId={}", consumerId);
-			consumer.subscribe(Arrays.asList(kafkaTopic), offsetLoggingCallback);
+			consumer.subscribe(kafkaTopics, offsetLoggingCallback);
 			while (true) {
 				boolean isPollFirstRecord = true;
 				int numProcessedMessages = 0;
@@ -79,7 +79,7 @@ public class ConsumerWorker implements Runnable {
 
 					try {
 						String processedMessage = messageHandler.transformMessage(record.value(), record.offset());
-						messageHandler.addMessageToBatch(processedMessage,record.topic());
+						messageHandler.addMessageToBatch(processedMessage, record.topic(), record.key());
 						partitionOffsetMap.put(record.partition(), record.offset());
 						numProcessedMessages++;
 					} catch (Exception e) {

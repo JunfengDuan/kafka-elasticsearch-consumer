@@ -7,6 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -56,14 +57,14 @@ public class ConsumerManager {
     @Value("${isPerfReportingEnabled:false}")
     private boolean isPerfReportingEnabled;
 
-//    @Value("${kafka.consumer.pool.count:3}")
-//    private int kafkaConsumerPoolCount;
+    @Value("${kafka.consumer.pool.count:3}")
+    private int kafkaConsumerPoolCount;
 
     private String consumerStartOptionsConfig;
     private IMessageHandler messageHandler;
 
     private ExecutorService consumersThreadPool = null;
-    private List<ConsumerWorker> consumers = new ArrayList<>();
+    private List<ConsumerWorker> consumers;
 
     private Properties kafkaProperties;
     private static KafkaConsumer<String, String> kafkaConsumer;
@@ -112,13 +113,13 @@ public class ConsumerManager {
         kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
         topicInfo = kafkaConsumer.listTopics();
 
-        kafkaTopics.addAll(topicInfo.keySet());
+        kafkaTopics = topicInfo.keySet().stream().filter(key -> !key.startsWith("_")).collect(toList());
         logger.info("kafkaTopics :{}",kafkaTopics);
 
         List<List<PartitionInfo>> list = new ArrayList<>(Collections.unmodifiableCollection(topicInfo.values()));
         List<PartitionInfo> partitionInfoList = list.stream().flatMap(List :: stream).filter(p -> !p.topic().startsWith("_")).collect(toList());
         Long partitions = partitionInfoList.stream().map(part -> part.partition()).count();
-        int numOfPartitions = Math.max(Integer.parseInt(partitions.toString()),1);
+        int numOfPartitions = Math.max(Integer.parseInt(partitions.toString()),kafkaConsumerPoolCount);
 
         consumers = new ArrayList<>();
         ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(KAFKA_CONSUMER_THREAD_NAME_FORMAT).build();
@@ -126,7 +127,7 @@ public class ConsumerManager {
 
         partitionInfoList.forEach(partitionInfo -> {
             ConsumerWorker consumer = new ConsumerWorker(
-                    partitionInfo.partition(), consumerInstanceName, partitionInfo.topic(), kafkaConsumer, kafkaPollIntervalMs, messageHandler);
+                    partitionInfo.partition(), consumerInstanceName, kafkaTopics, kafkaConsumer, kafkaPollIntervalMs, messageHandler);
             consumers.add(consumer);
             consumersThreadPool.submit(consumer);
         });

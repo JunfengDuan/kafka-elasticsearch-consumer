@@ -55,7 +55,8 @@ public class ElasticSearchBatchService {
      */
     public void addEventToBulkRequest(String inputMessage, String indexName, String indexType, String eventUUID, String routingValue) throws ExecutionException {
     	initBulkRequestBuilder();
-        IndexRequestBuilder indexRequestBuilder = elasticSearchClientService.prepareIndex(indexName, indexType, eventUUID);
+        IndexRequestBuilder indexRequestBuilder = elasticSearchClientService.prepareIndex(indexName, indexType);
+        indexRequestBuilder.setId(eventUUID);
         indexRequestBuilder.setSource(inputMessage);
         if (routingValue != null && routingValue.trim().length()>0) {
             indexRequestBuilder.setRouting(routingValue);

@@ -16,6 +16,8 @@ public interface IMessageHandler {
      */
     public void addMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception;
 
+    public void upDateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception;
+
     public String transformMessage(String inputMessage, Long offset) throws Exception;
     
 

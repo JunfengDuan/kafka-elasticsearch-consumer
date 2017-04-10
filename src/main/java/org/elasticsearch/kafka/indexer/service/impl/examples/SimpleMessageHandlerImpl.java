@@ -47,6 +47,13 @@ public class SimpleMessageHandlerImpl implements IMessageHandler {
 	}
 
 	@Override
+	public void upDateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception {
+		String routingValue = null;
+		elasticSearchBatchService.updateEventToBulkRequest(
+				inputMessage, indexName, indexType, eventUUID, routingValue);
+	}
+
+	@Override
 	public void postToElasticSearch() throws InterruptedException, IndexerESRecoverableException, IndexerESNotRecoverableException {
 		elasticSearchBatchService.postToElasticSearch();
 	}

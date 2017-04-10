@@ -10,6 +10,7 @@ import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.action.update.UpdateRequestBuilder;
 import org.elasticsearch.client.transport.NoNodeAvailableException;
 import org.elasticsearch.kafka.indexer.exception.IndexerESNotRecoverableException;
 import org.elasticsearch.kafka.indexer.exception.IndexerESRecoverableException;
@@ -62,6 +63,17 @@ public class ElasticSearchBatchService {
             indexRequestBuilder.setRouting(routingValue);
         }
         bulkRequestBuilder.add(indexRequestBuilder);
+        indexNames.add(indexName);
+    }
+
+    public void updateEventToBulkRequest(String insertMessage, String indexName, String indexType, String eventUUID, String routingValue) throws Exception{
+        initBulkRequestBuilder();
+        UpdateRequestBuilder updateRequestBuilder = elasticSearchClientService.prepareUpdate(indexName, indexType, eventUUID);
+        updateRequestBuilder.setDoc(insertMessage);
+        if (routingValue != null && routingValue.trim().length()>0) {
+            updateRequestBuilder.setRouting(routingValue);
+        }
+        bulkRequestBuilder.add(updateRequestBuilder);
         indexNames.add(indexName);
     }
 

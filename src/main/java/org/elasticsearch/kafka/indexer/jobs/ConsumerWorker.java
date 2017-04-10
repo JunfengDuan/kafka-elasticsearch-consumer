@@ -1,5 +1,7 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
+import kafka.utils.Json;
+import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
@@ -11,6 +13,9 @@ import org.elasticsearch.kafka.indexer.service.OffsetLoggingCallbackImpl;
 import org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Option;
+import scala.util.parsing.json.JSON;
+import scala.util.parsing.json.JSONObject;
 
 import java.util.*;
 
@@ -20,6 +25,8 @@ import java.util.*;
 public class ConsumerWorker implements Runnable {
 
 	private static final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
+	private static final String PARENTID = "parentId";
+	private static final String PARENTName = "parentTableName";
 	private IMessageHandler messageHandler;
 	private KafkaConsumer<String, String> consumer;
 //	private final String kafkaTopic;
@@ -44,6 +51,18 @@ public class ConsumerWorker implements Runnable {
 		logger.info(
 				"Created ConsumerWorker with properties: consumerId={}, consumerInstanceName={}, kafkaTopic={}, kafkaProperties={}",
 				consumerId, consumerInstanceName, kafkaTopics);
+	}
+
+	private void addOrUpdateMessageToBatch(String processedMessage, String topic, String id) throws Exception{
+
+		com.alibaba.fastjson.JSONObject json = com.alibaba.fastjson.JSON.parseObject(processedMessage);
+		String parentId = (String)json.get(PARENTID);
+		String parentTableName = (String)json.get(PARENTName);
+		if(StringUtils.isBlank(parentId)){
+			messageHandler.addMessageToBatch(processedMessage, topic, id);
+		}else{
+			messageHandler.upDateMessageToBatch(processedMessage, parentTableName, parentId);
+		}
 	}
 
 	@Override
@@ -79,7 +98,7 @@ public class ConsumerWorker implements Runnable {
 
 					try {
 						String processedMessage = messageHandler.transformMessage(record.value(), record.offset());
-						messageHandler.addMessageToBatch(processedMessage, record.topic(), record.key());
+						addOrUpdateMessageToBatch(processedMessage, record.topic(), record.key());
 						partitionOffsetMap.put(record.partition(), record.offset());
 						numProcessedMessages++;
 					} catch (Exception e) {

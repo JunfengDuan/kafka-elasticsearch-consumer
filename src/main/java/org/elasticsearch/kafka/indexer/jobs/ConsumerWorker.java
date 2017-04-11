@@ -1,6 +1,9 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
-import kafka.utils.Json;
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.JSONReader;
 import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
@@ -10,13 +13,8 @@ import org.elasticsearch.kafka.indexer.exception.IndexerESNotRecoverableExceptio
 import org.elasticsearch.kafka.indexer.exception.IndexerESRecoverableException;
 import org.elasticsearch.kafka.indexer.service.IMessageHandler;
 import org.elasticsearch.kafka.indexer.service.OffsetLoggingCallbackImpl;
-import org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.Option;
-import scala.util.parsing.json.JSON;
-import scala.util.parsing.json.JSONObject;
-
 import java.util.*;
 
 /**
@@ -37,6 +35,7 @@ public class ConsumerWorker implements Runnable {
 	private long pollIntervalMs;
 	private OffsetLoggingCallbackImpl offsetLoggingCallback;
 
+
 	public ConsumerWorker(int consumerId, String consumerInstanceName, List<String> kafkaTopics, KafkaConsumer consumer,
 			long pollIntervalMs, IMessageHandler messageHandler) {
 		this.consumer = consumer;
@@ -56,12 +55,28 @@ public class ConsumerWorker implements Runnable {
 	private void addOrUpdateMessageToBatch(String processedMessage, String topic, String id) throws Exception{
 
 		com.alibaba.fastjson.JSONObject json = com.alibaba.fastjson.JSON.parseObject(processedMessage);
-		String parentId = (String)json.get(PARENTID);
-		String parentTableName = (String)json.get(PARENTName);
+		String parentId = json.containsKey(PARENTID)? (String)json.get(PARENTID) : "";
+		String parentTableName = json.containsKey(PARENTName)? (String)json.get(PARENTName) : "";
 		if(StringUtils.isBlank(parentId)){
 			messageHandler.addMessageToBatch(processedMessage, topic, id);
 		}else{
-			messageHandler.upDateMessageToBatch(processedMessage, parentTableName, parentId);
+			JSONObject josnMessage = new JSONObject();
+			josnMessage.put(topic, getJsonArray(processedMessage));
+			JSONObject inputMessage = new JSONObject(josnMessage);
+			logger.info("\ninputMessage:{}\nparentTableName:{}", inputMessage, parentTableName);
+			messageHandler.upDateMessageToBatch(inputMessage.toString(), parentTableName, parentId);
+		}
+	}
+
+	private JSONArray getJsonArray(String message){
+		Object obj = JSON.parse(message);
+		JSONArray array = new JSONArray();
+
+		if(obj instanceof JSONObject){
+			array.add(obj);
+			return array;
+		}else{
+			return (JSONArray) obj;
 		}
 	}
 

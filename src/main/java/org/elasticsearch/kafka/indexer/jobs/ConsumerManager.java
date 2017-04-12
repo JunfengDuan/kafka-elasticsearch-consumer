@@ -111,10 +111,6 @@ public class ConsumerManager {
     private void initConsumers() {
         logger.info("initConsumers() started");
         kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
-        topicInfo = kafkaConsumer.listTopics();
-
-        kafkaTopics = topicInfo.keySet().stream().filter(key -> !key.startsWith("_")).collect(toList());
-        logger.info("kafkaTopics :{}",kafkaTopics);
 
         List<List<PartitionInfo>> list = new ArrayList<>(Collections.unmodifiableCollection(topicInfo.values()));
         List<PartitionInfo> partitionInfoList = list.stream().flatMap(List :: stream).filter(p -> !p.topic().startsWith("_")).collect(toList());
@@ -167,6 +163,10 @@ public class ConsumerManager {
 
     private void determineOffsetForAllPartitionsAndSeek() {
         KafkaConsumer consumer = new KafkaConsumer<>(kafkaProperties);
+        topicInfo = consumer.listTopics();
+
+        kafkaTopics = topicInfo.keySet().stream().filter(key -> !key.startsWith("_")).collect(toList());
+        logger.info("kafkaTopics :{}",kafkaTopics);
         consumer.subscribe(kafkaTopics);
 
         //Make init poll to get assigned partitions

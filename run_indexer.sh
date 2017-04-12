@@ -8,10 +8,10 @@ INDEXER_HOME=/home/jfd/soft/kafka-elasticsearch-consumer
 JAVA_HOME=/home/jfd/soft/jdk1.8.0_112
 
 # CHANGE FOR YOUR ENV: absolute path of the logback config file
-LOGBACK_CONFIG_FILE=/home/jfd/soft/kafka-elasticsearch-consumer/src/main/resources/config/logback.xml
+LOGBACK_CONFIG_FILE=/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/logback.xml
 
 # CHANGE FOR YOUR ENV: absolute path of the indexer properties file
-INDEXER_PROPERTIES_FILE=/home/jfd/soft/kafka-elasticsearch-consumer/src/main/resources/config/kafka-es-indexer.properties
+INDEXER_PROPERTIES_FILE=/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer.properties
 
 # DO NOT CHANGE ANYTHING BELOW THIS POINT (unless you know what you are doing :) )!
 echo "Starting Kafka ES Indexer app ..."
@@ -27,7 +27,7 @@ do
 done
 echo "CLASS_PATH=$CLASS_PATH"
 
-$JAVA_HOME/bin/java -Xmx1g -cp $CLASS_PATH -Dindexer.properties=$INDEXER_PROPERTIES_FILE -Dlogback.configurationFile=$LOGBACK_CONFIG_FILE org.elasticsearch.kafka.indexer.KafkaESIndexerProcess 
+$JAVA_HOME/bin/java -Xmx1g -cp $CLASS_PATH -Dindexer.properties=$INDEXER_PROPERTIES_FILE -Dlogback.configurationFile=$LOGBACK_CONFIG_FILE org.elasticsearch.kafka.indexer.KafkaESIndexerProcess
 
 
 

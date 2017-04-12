@@ -60,7 +60,11 @@ public class ConsumerManager {
     @Value("${kafka.consumer.pool.count:3}")
     private int kafkaConsumerPoolCount;
 
+    @Value("${consumerStartOptionsConfigPath}")
     private String consumerStartOptionsConfig;
+
+    private Map<Integer, ConsumerStartOption> consumerStartOptions;
+
     private IMessageHandler messageHandler;
 
     private ExecutorService consumersThreadPool = null;
@@ -70,8 +74,6 @@ public class ConsumerManager {
     private static KafkaConsumer<String, String> kafkaConsumer;
     private static Map<String, List<PartitionInfo> > topicInfo = new HashMap<>();
     private static List<String> kafkaTopics = new ArrayList<>();
-
-    private Map<Integer, ConsumerStartOption> consumerStartOptions;
 
     private AtomicBoolean running = new AtomicBoolean(false);
 
@@ -85,9 +87,9 @@ public class ConsumerManager {
         this.messageHandler = messageProcessor;
     }
 
-    public void setConsumerStartOptionsConfig(String consumerStartOptionsConfig) {
+   /* public void setConsumerStartOptionsConfig(String consumerStartOptionsConfig) {
         this.consumerStartOptionsConfig = consumerStartOptionsConfig;
-    }
+    }*/
 
     private void init() {
         logger.info("init() is starting ....");
@@ -176,10 +178,10 @@ public class ConsumerManager {
         //apply start offset options to partitions specified in 'consumer-start-options.config' file
         for (TopicPartition topicPartition : assignedTopicPartitions) {
             ConsumerStartOption startOption = consumerStartOptions.get(topicPartition.partition());
-            long offsetBeforeSeek = consumer.position(topicPartition);
             if (startOption == null) {
                 startOption = consumerStartOptions.get(ConsumerStartOption.DEFAULT);
             }
+            long offsetBeforeSeek = consumer.position(topicPartition);
             switch (startOption.getStartFrom()) {
                 case CUSTOM:
                     consumer.seek(topicPartition, startOption.getStartOffset());

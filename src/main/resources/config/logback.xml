@@ -3,7 +3,7 @@
 	<!-- PLEASE set to values appropriate for YOUR environment -->
 	<!-- example properties for your reference -->
   	<property name="ENVIRONMENT" value="development"/>
-	<property name="LOG_DIR" value="/home/jfd/logs"/>
+	<property name="LOG_DIR" value="/home/jfd/kafka_es_logs"/>
 	<property name="MAX_HISTORY_MAIN_LOG" value="10"/>
 	<property name="MAX_SIZE_MAIN_LOG" value="10KB"/>
 	<property name="MAX_HISTORY_FAILED_LOG" value="5"/>

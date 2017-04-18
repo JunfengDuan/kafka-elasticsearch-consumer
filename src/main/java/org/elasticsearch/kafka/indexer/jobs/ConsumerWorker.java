@@ -12,9 +12,12 @@ import org.elasticsearch.kafka.indexer.exception.IndexerESNotRecoverableExceptio
 import org.elasticsearch.kafka.indexer.exception.IndexerESRecoverableException;
 import org.elasticsearch.kafka.indexer.service.IMessageHandler;
 import org.elasticsearch.kafka.indexer.service.OffsetLoggingCallbackImpl;
+import org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author marinapopova Apr 13, 2016
@@ -26,13 +29,15 @@ public class ConsumerWorker implements Runnable {
 	private static final String PARENTName = "parentTableName";
 	private IMessageHandler messageHandler;
 	private KafkaConsumer<String, String> consumer;
-//	private final String kafkaTopic;
 	private final List<String> kafkaTopics;
 	private final int consumerId;
 	// interval in MS to poll Kafka brokers for messages, in case there were no
 	// messages during the previous interval
 	private long pollIntervalMs;
 	private OffsetLoggingCallbackImpl offsetLoggingCallback;
+	private AtomicBoolean topicIsChanged = new AtomicBoolean(false);
+
+	private static ConsumerManager consumerManager = new ConsumerManager();
 
 
 	public ConsumerWorker(int consumerId, String consumerInstanceName, List<String> kafkaTopics, KafkaConsumer consumer,
@@ -44,7 +49,6 @@ public class ConsumerWorker implements Runnable {
 		this.consumerId = consumerId;
 		this.kafkaTopics = kafkaTopics;
 		this.pollIntervalMs = pollIntervalMs;
-//		consumer = new KafkaConsumer<>(kafkaProperties);
 		offsetLoggingCallback = new OffsetLoggingCallbackImpl();
 		logger.info(
 				"Created ConsumerWorker with properties: consumerId={}, consumerInstanceName={}, kafkaTopic={}, kafkaProperties={}",
@@ -141,7 +145,9 @@ public class ConsumerWorker implements Runnable {
 					consumer.commitAsync(offsetLoggingCallback);
 				}
 
+
 			}
+
 		} catch (WakeupException e) {
 			logger.warn("ConsumerWorker [consumerId={}] got WakeupException - exiting ... Exception: {}", consumerId,
 					e.getMessage());
@@ -158,11 +164,25 @@ public class ConsumerWorker implements Runnable {
 			logger.error("ConsumerWorker [consumerId={}] got Exception - exiting ... Exception: {}", consumerId,
 					e.getMessage());
 		} finally {
-			logger.warn("ConsumerWorker [consumerId={}] is shutting down ...", consumerId);
-			consumer.close();
+			if (consumer != null){
+				logger.warn("ConsumerWorker [consumerId={}] is shutting down ...", consumerId);
+				consumer.close();
+			}
 		}
 	}
-	
+
+	synchronized private void checkTopic(){
+		logger.info("Checking topic...");
+		List<String> topics = consumerManager.getKafkaTopics(consumer);
+		if(topics.size()>kafkaTopics.size()){
+			logger.info("Topic has changed,The new topics are:{}",topics);
+			topicIsChanged.set(true);
+
+		}else {
+			logger.info("Topic has no changed.");
+		}
+	}
+
 	private boolean postToElasticSearch() throws InterruptedException, IndexerESNotRecoverableException{
 		boolean moveToTheNextBatch = true;
 		try {

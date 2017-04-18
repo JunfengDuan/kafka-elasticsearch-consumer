@@ -15,16 +15,22 @@
             location="file:/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer.properties"
     	    ignore-resource-not-found="true" />
 
+	<!--
+	<context:property-placeholder location="classpath:config/kafka-es-indexer.properties"
+								  ignore-resource-not-found="true" />
+-->
     <bean id="messageHandler"
 		  class="org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl"
 		  scope="prototype"
 		  />
-	  
-    <!--<bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
-            p:messageHandler-ref="messageHandler"
-    	    p:consumerStartOptionsConfig="/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer-start-options.config"/>
--->
+
 	<bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
 		  p:messageHandler-ref="messageHandler"/>
+
+	<!--
+	<bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
+           p:messageHandler-ref="messageHandler"
+           p:consumerStartOptionsConfig="/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer-start-options.config"/>
+     -->
 
 </beans>

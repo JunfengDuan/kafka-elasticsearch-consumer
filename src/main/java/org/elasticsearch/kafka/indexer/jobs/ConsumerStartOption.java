@@ -1,5 +1,6 @@
 package org.elasticsearch.kafka.indexer.jobs;
 
+import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,28 @@ public class ConsumerStartOption {
 		}
 	}
 
-	public static Map<Integer, ConsumerStartOption> fromFile(File configFile) throws IllegalArgumentException {
+	public  static  Map<Integer, ConsumerStartOption> fromConfig(String line) throws IllegalArgumentException {
+		Map<Integer, ConsumerStartOption> config = new HashMap<>();
+		if (StringUtils.isNotBlank(line)) {
+			try {
+				ConsumerStartOption option = new ConsumerStartOption(line);
+				config.put(option.getPartition(), option);
+			} catch (Exception e) {
+				String message = "Unable to read Consumer start options configuration";
+				logger.error(message);
+				throw new IllegalArgumentException(message);
+			}
+		} else {
+			logger.warn("Consumer start options configuration '" + "' doesn't exist. Consumer will use 'RESTART' option by default");
+		}
+
+		//check for default option
+		if (!config.containsKey(DEFAULT)) {
+			config.put(DEFAULT, new ConsumerStartOption(DEFAULT, StartFrom.RESTART, 0L));
+		}
+		return config;
+	}
+	/*public static Map<Integer, ConsumerStartOption> fromFile(File configFile) throws IllegalArgumentException {
 		Map<Integer, ConsumerStartOption> config = new HashMap<>();
 		if (configFile.exists()) {
 			try {
@@ -80,7 +102,7 @@ public class ConsumerStartOption {
 			config.put(DEFAULT, new ConsumerStartOption(DEFAULT, StartFrom.RESTART, 0L));
 		}
 		return config;
-	}
+	}*/
 
 	public int getPartition() {
 		return partition;

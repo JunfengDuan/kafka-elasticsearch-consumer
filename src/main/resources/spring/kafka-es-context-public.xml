@@ -27,10 +27,4 @@
 	<bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
 		  p:messageHandler-ref="messageHandler"/>
 
-	<!--
-	<bean id="kafkaESConsumerManager" class="org.elasticsearch.kafka.indexer.jobs.ConsumerManager"
-           p:messageHandler-ref="messageHandler"
-           p:consumerStartOptionsConfig="/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer-start-options.config"/>
-     -->
-
 </beans>

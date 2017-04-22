@@ -38,9 +38,6 @@ public class ConsumerManager {
 
     private static final Logger logger = LoggerFactory.getLogger(ConsumerManager.class);
     private static final String KAFKA_CONSUMER_THREAD_NAME_FORMAT = "kafka-elasticsearch-consumer-thread-%d";
-
-//    @Value("${topic:testTopic}")
-//    private String kafkaTopic;
     @Value("${consumerGroupName:kafka-elasticsearch-consumer}")
     private String consumerGroupName;
     @Value("${consumerInstanceName:instance1}")
@@ -64,7 +61,7 @@ public class ConsumerManager {
     @Value("${kafka.consumer.pool.count:3}")
     private int kafkaConsumerPoolCount;
 
-    @Value("${consumerStartOptionsConfigPath}")
+    @Value("${consumerStartOptions:RESTART}")
     private String consumerStartOptionsConfig;
 
     @Value("${kafkaReinitSleepTimeMs:5000}")
@@ -78,14 +75,13 @@ public class ConsumerManager {
     private List<ConsumerWorker> consumers;
 
     private Properties kafkaProperties;
-    private static KafkaConsumer<String, String> kafkaConsumer;
     private static Map<String, List<PartitionInfo> > topicInfo = new HashMap<>();
     private static List<String> kafkaTopics = new ArrayList<>();
     private static Map<String,Object> props = new HashMap<>();
     private static final String OPTION_CONFIG = "optionsConfig";
     private static final String SLEEP_TIME = "sleepTime";
 
-    public static ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(KAFKA_CONSUMER_THREAD_NAME_FORMAT).build();
+    public static ThreadFactory threadFactory;
 
     private AtomicBoolean running = new AtomicBoolean(false);
 
@@ -97,17 +93,7 @@ public class ConsumerManager {
         this.messageHandler = messageProcessor;
     }
 
-   /* public void setConsumerStartOptionsConfig(String consumerStartOptionsConfig) {
-        this.consumerStartOptionsConfig = consumerStartOptionsConfig;
-    }*/
-    private  void getProperties(){
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokersList);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupName);
-        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, consumerSessionTimeoutMs);
-        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, maxPartitionFetchBytes);
-        props.put(OPTION_CONFIG,consumerStartOptionsConfig);
-        props.put(SLEEP_TIME,kafkaReinitSleepTimeMs);
-    }
+
     public void init() {
         if(props.isEmpty())
             getProperties();
@@ -123,14 +109,13 @@ public class ConsumerManager {
         kafkaProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
         // TODO make a dynamic property determined from the mockedKafkaCluster metadata
-        consumerStartOptions = ConsumerStartOption.fromFile(new File((String)props.get(OPTION_CONFIG)));
+        consumerStartOptions = ConsumerStartOption.fromConfig((String)props.get(OPTION_CONFIG));
         determineOffsetForAllPartitionsAndSeek();
         initConsumers();
     }
 
     public void initConsumers() {
         logger.info("initConsumers() started");
-        kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
 
         List<List<PartitionInfo>> list = new ArrayList<>(Collections.unmodifiableCollection(topicInfo.values()));
         List<PartitionInfo> partitionInfoList = list.stream().flatMap(List :: stream).filter(p -> !p.topic().startsWith("_")).collect(toList());
@@ -138,18 +123,54 @@ public class ConsumerManager {
         int numOfPartitions = Math.max(Integer.parseInt(partitions.toString()),kafkaConsumerPoolCount);
 
         consumers = new ArrayList<>();
-
+        threadFactory = new ThreadFactoryBuilder().setNameFormat(KAFKA_CONSUMER_THREAD_NAME_FORMAT).build();
         consumersThreadPool = Executors.newFixedThreadPool(numOfPartitions, threadFactory);
 
         partitionInfoList.forEach(partitionInfo -> {
             ConsumerWorker consumerWorker = new ConsumerWorker(
-                    partitionInfo.partition(), consumerInstanceName, kafkaTopics, kafkaConsumer, kafkaPollIntervalMs, messageHandler);
+                    partitionInfo.partition(), consumerInstanceName, kafkaTopics, kafkaProperties, kafkaPollIntervalMs, messageHandler);
             consumers.add(consumerWorker);
             consumersThreadPool.submit(consumerWorker);
         });
 
     }
 
+    public void determineOffsetForAllPartitionsAndSeek() {
+        KafkaConsumer kafkaConsumer = new KafkaConsumer<>(kafkaProperties);
+        getKafkaTopics(kafkaConsumer);
+        kafkaConsumer.subscribe(kafkaTopics);
+
+        //Make init poll to get assigned partitions
+        kafkaConsumer.poll(kafkaPollIntervalMs);
+        Set<TopicPartition> assignedTopicPartitions = kafkaConsumer.assignment();
+
+        //apply start offset options to partitions specified in 'kafkaConsumer-start-options.config' file
+        for (TopicPartition topicPartition : assignedTopicPartitions) {
+            ConsumerStartOption startOption = consumerStartOptions.get(topicPartition.partition());
+            if (startOption == null) {
+                startOption = consumerStartOptions.get(ConsumerStartOption.DEFAULT);
+            }
+            long offsetBeforeSeek = kafkaConsumer.position(topicPartition);
+            switch (startOption.getStartFrom()) {
+                case CUSTOM:
+                    kafkaConsumer.seek(topicPartition, startOption.getStartOffset());
+                    break;
+                case EARLIEST:
+                    kafkaConsumer.seekToBeginning(topicPartition);
+                    break;
+                case LATEST:
+                    kafkaConsumer.seekToEnd(topicPartition);
+                    break;
+                case RESTART:
+                default:
+                    break;
+            }
+            logger.info("Offset for partition: {} is moved from : {} to {}", topicPartition.partition(), offsetBeforeSeek, kafkaConsumer.position(topicPartition));
+            logger.info("Offset position during the startup for consumerId : {}, partition : {}, offset : {}", Thread.currentThread().getName(), topicPartition.partition(), kafkaConsumer.position(topicPartition));
+        }
+        kafkaConsumer.commitSync();
+        kafkaConsumer.close();
+    }
 
     public void shutdownConsumers() {
         logger.info("shutdownConsumers() started ....");
@@ -182,41 +203,13 @@ public class ConsumerManager {
         return kafkaTopics;
     }
 
-    public void determineOffsetForAllPartitionsAndSeek() {
-        KafkaConsumer consumer = new KafkaConsumer<>(kafkaProperties);
-        getKafkaTopics(consumer);
-        consumer.subscribe(kafkaTopics);
-
-        //Make init poll to get assigned partitions
-        consumer.poll(kafkaPollIntervalMs);
-        Set<TopicPartition> assignedTopicPartitions = consumer.assignment();
-
-        //apply start offset options to partitions specified in 'consumer-start-options.config' file
-        for (TopicPartition topicPartition : assignedTopicPartitions) {
-            ConsumerStartOption startOption = consumerStartOptions.get(topicPartition.partition());
-            if (startOption == null) {
-                startOption = consumerStartOptions.get(ConsumerStartOption.DEFAULT);
-            }
-            long offsetBeforeSeek = consumer.position(topicPartition);
-            switch (startOption.getStartFrom()) {
-                case CUSTOM:
-                    consumer.seek(topicPartition, startOption.getStartOffset());
-                    break;
-                case EARLIEST:
-                    consumer.seekToBeginning(topicPartition);
-                    break;
-                case LATEST:
-                    consumer.seekToEnd(topicPartition);
-                    break;
-                case RESTART:
-                default:
-                    break;
-            }
-            logger.info("Offset for partition: {} is moved from : {} to {}", topicPartition.partition(), offsetBeforeSeek, consumer.position(topicPartition));
-            logger.info("Offset position during the startup for consumerId : {}, partition : {}, offset : {}", Thread.currentThread().getName(), topicPartition.partition(), consumer.position(topicPartition));
-        }
-        consumer.commitSync();
-        consumer.close();
+    private  void getProperties(){
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokersList);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupName);
+        props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, consumerSessionTimeoutMs);
+        props.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, maxPartitionFetchBytes);
+        props.put(OPTION_CONFIG,consumerStartOptionsConfig);
+        props.put(SLEEP_TIME,kafkaReinitSleepTimeMs);
     }
 
     @PostConstruct

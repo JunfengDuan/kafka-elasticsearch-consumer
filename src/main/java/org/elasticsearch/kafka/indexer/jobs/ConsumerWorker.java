@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang.StringUtils;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.elasticsearch.kafka.indexer.FailedEventsLogger;
@@ -40,11 +41,11 @@ public class ConsumerWorker implements Runnable {
 	private static ConsumerManager consumerManager = new ConsumerManager();
 
 
-	public ConsumerWorker(int consumerId, String consumerInstanceName, List<String> kafkaTopics, KafkaConsumer consumer,
+	public ConsumerWorker(int consumerId, String consumerInstanceName, List<String> kafkaTopics, Properties kafkaProperties,
 			long pollIntervalMs, IMessageHandler messageHandler) {
-		this.consumer = consumer;
 		this.messageHandler = messageHandler;
-//		kafkaProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, consumerInstanceName + "-" + consumerId);
+		kafkaProperties.put(ConsumerConfig.CLIENT_ID_CONFIG, consumerInstanceName + "-" + consumerId);
+		this.consumer = new KafkaConsumer<>(kafkaProperties);
 
 		this.consumerId = consumerId;
 		this.kafkaTopics = kafkaTopics;
@@ -145,6 +146,12 @@ public class ConsumerWorker implements Runnable {
 					consumer.commitAsync(offsetLoggingCallback);
 				}
 
+				List<String> newTopics = topicIsChanged();
+				if(newTopics.size()>0){
+					logger.info("Kafka topics are changed, new topics are :{}",kafkaTopics);
+					consumer.subscribe(kafkaTopics, offsetLoggingCallback);
+					consumer.commitSync(getPartitionAndOffset(newTopics.get(0),0));
+				}
 
 			}
 
@@ -171,16 +178,24 @@ public class ConsumerWorker implements Runnable {
 		}
 	}
 
-	synchronized private void checkTopic(){
-		logger.info("Checking topic...");
+	private List<String> topicIsChanged(){
+		ConsumerManager consumerManager = new ConsumerManager();
 		List<String> topics = consumerManager.getKafkaTopics(consumer);
-		if(topics.size()>kafkaTopics.size()){
-			logger.info("Topic has changed,The new topics are:{}",topics);
-			topicIsChanged.set(true);
-
-		}else {
-			logger.info("Topic has no changed.");
+		List<String> remain = new ArrayList<>();
+		if(topics.size() > kafkaTopics.size()){
+			remain.addAll(topics);
+			remain.removeAll(kafkaTopics);
+			kafkaTopics.addAll(topics);
 		}
+		return remain;
+	}
+
+	private Map getPartitionAndOffset(String topic, long offset){
+		Map map = new HashMap();
+		List<PartitionInfo> partitionInfos = consumer.partitionsFor(topic);
+		PartitionInfo partitionInfo = partitionInfos.get(0);
+		map.put(new TopicPartition(partitionInfo.topic(),partitionInfo.partition()),new OffsetAndMetadata(offset));
+		return map;
 	}
 
 	private boolean postToElasticSearch() throws InterruptedException, IndexerESNotRecoverableException{

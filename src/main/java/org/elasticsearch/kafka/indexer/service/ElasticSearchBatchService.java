@@ -11,6 +11,7 @@ import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.update.UpdateRequestBuilder;
 import org.elasticsearch.client.transport.NoNodeAvailableException;
@@ -76,6 +77,16 @@ public class ElasticSearchBatchService {
             updateRequestBuilder.setRouting(routingValue);
         }
         bulkRequestBuilder.add(updateRequestBuilder);
+        indexNames.add(indexName);
+    }
+
+    public void deleteEventRequest(String indexName, String indexType, String eventUUID, String routingValue) throws ExecutionException {
+        initBulkRequestBuilder();
+        DeleteRequestBuilder deleteRequestBuilder = elasticSearchClientService.prepareDelete(indexName, indexType, eventUUID);
+        if (routingValue != null && routingValue.trim().length()>0) {
+            deleteRequestBuilder.setRouting(routingValue);
+        }
+        bulkRequestBuilder.add(deleteRequestBuilder);
         indexNames.add(indexName);
     }
 

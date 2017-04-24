@@ -11,12 +11,15 @@ public interface IMessageHandler {
     /**
      * Add messages to Batch
      * @param inputMessage
-     * @param offset
+     * @param indexType
+     * @param eventUUID
      * @throws Exception
      */
     public void addMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception;
 
-    public void upDateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception;
+    public void updateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception;
+
+    public void deleteMessageToBatch(String indexType, String eventUUID) throws Exception;
 
     public String transformMessage(String inputMessage, Long offset) throws Exception;
     

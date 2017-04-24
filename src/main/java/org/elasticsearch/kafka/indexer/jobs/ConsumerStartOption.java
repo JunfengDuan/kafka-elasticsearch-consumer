@@ -33,10 +33,10 @@ public class ConsumerStartOption {
 			throw new IllegalArgumentException("Option value cannot be null");
 		}
 
-		String[] values = property.split(":");
-		if (values.length < 2) {
+		String[] values = property.contains(":") ? property.split(":") : new String[]{"default", property};
+		/*if (values.length < 2) {
 			throw new IllegalArgumentException("Wrong consumer start option format. Cannot split '" + property + "'");
-		}
+		}*/
 		if (values[0].equalsIgnoreCase("default")) {
 			partition = DEFAULT; //mark as default option
 		} else {
@@ -74,35 +74,6 @@ public class ConsumerStartOption {
 		}
 		return config;
 	}
-	/*public static Map<Integer, ConsumerStartOption> fromFile(File configFile) throws IllegalArgumentException {
-		Map<Integer, ConsumerStartOption> config = new HashMap<>();
-		if (configFile.exists()) {
-			try {
-				List<String> lines = Files.readAllLines(configFile.toPath());
-				lines.stream()
-						//filter empty lines and comments (lines starts with '#')
-						.filter(line -> !line.isEmpty() && !line.startsWith("#"))
-						.forEach(line -> {
-							ConsumerStartOption option = new ConsumerStartOption(line);
-							config.put(option.getPartition(), option);
-						});
-			} catch (IOException e) {
-				String message = "Unable to read Consumer start options configuration file from '" +
-						configFile.getPath() + "'";
-				logger.error(message);
-				throw new IllegalArgumentException(message);
-			}
-		} else {
-			logger.warn("Consumer start options configuration file '"
-					+ configFile.getPath() + "' doesn't exist. Consumer will use 'RESTART' option by default");
-		}
-
-		//check for default option
-		if (!config.containsKey(DEFAULT)) {
-			config.put(DEFAULT, new ConsumerStartOption(DEFAULT, StartFrom.RESTART, 0L));
-		}
-		return config;
-	}*/
 
 	public int getPartition() {
 		return partition;

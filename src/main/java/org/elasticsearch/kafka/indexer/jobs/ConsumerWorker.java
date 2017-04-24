@@ -28,6 +28,8 @@ public class ConsumerWorker implements Runnable {
 	private static final Logger logger = LoggerFactory.getLogger(ConsumerWorker.class);
 	private static final String PARENTID = "parentId";
 	private static final String PARENTName = "parentTableName";
+	private static final String OP = "op";
+	private static final String DELETE = "delete";
 	private IMessageHandler messageHandler;
 	private KafkaConsumer<String, String> consumer;
 	private final List<String> kafkaTopics;
@@ -36,7 +38,6 @@ public class ConsumerWorker implements Runnable {
 	// messages during the previous interval
 	private long pollIntervalMs;
 	private OffsetLoggingCallbackImpl offsetLoggingCallback;
-	private AtomicBoolean topicIsChanged = new AtomicBoolean(false);
 
 	private static ConsumerManager consumerManager = new ConsumerManager();
 
@@ -54,34 +55,6 @@ public class ConsumerWorker implements Runnable {
 		logger.info(
 				"Created ConsumerWorker with properties: consumerId={}, consumerInstanceName={}, kafkaTopic={}, kafkaProperties={}",
 				consumerId, consumerInstanceName, kafkaTopics);
-	}
-
-	private void addOrUpdateMessageToBatch(String processedMessage, String topic, String id) throws Exception{
-
-		com.alibaba.fastjson.JSONObject json = com.alibaba.fastjson.JSON.parseObject(processedMessage);
-		String parentId = json.containsKey(PARENTID)? (String)json.get(PARENTID) : "";
-		String parentTableName = json.containsKey(PARENTName)? (String)json.get(PARENTName) : "";
-		if(StringUtils.isBlank(parentId)){
-			messageHandler.addMessageToBatch(processedMessage, topic, id);
-		}else{
-			JSONObject josnMessage = new JSONObject();
-			josnMessage.put(topic, getJsonArray(processedMessage));
-			JSONObject inputMessage = new JSONObject(josnMessage);
-			logger.info("\ninputMessage:{}\nparentTableName:{}", inputMessage, parentTableName);
-			messageHandler.upDateMessageToBatch(inputMessage.toString(), parentTableName, parentId);
-		}
-	}
-
-	private JSONArray getJsonArray(String message){
-		Object obj = JSON.parse(message);
-		JSONArray array = new JSONArray();
-
-		if(obj instanceof JSONObject){
-			array.add(obj);
-			return array;
-		}else{
-			return (JSONArray) obj;
-		}
 	}
 
 	@Override
@@ -117,7 +90,7 @@ public class ConsumerWorker implements Runnable {
 
 					try {
 						String processedMessage = messageHandler.transformMessage(record.value(), record.offset());
-						addOrUpdateMessageToBatch(processedMessage, record.topic(), record.key());
+						addOrUpdateOrDelMessageToBatch(processedMessage, record.topic(), record.key());
 						partitionOffsetMap.put(record.partition(), record.offset());
 						numProcessedMessages++;
 					} catch (Exception e) {
@@ -137,10 +110,10 @@ public class ConsumerWorker implements Runnable {
 
 				// push to ES whole batch
 				boolean moveToNextBatch = false;
-				if (!records.isEmpty()) {				
+				if (!records.isEmpty()) {
 					moveToNextBatch = postToElasticSearch();
 				}
-				
+
 				if (moveToNextBatch) {
 					logger.info("Invoking commit for partition/offset : {}", partitionOffsetMap);
 					consumer.commitAsync(offsetLoggingCallback);
@@ -159,8 +132,8 @@ public class ConsumerWorker implements Runnable {
 			logger.warn("ConsumerWorker [consumerId={}] got WakeupException - exiting ... Exception: {}", consumerId,
 					e.getMessage());
 			// ignore for shutdown
-		} 
-		
+		}
+
 		catch (IndexerESNotRecoverableException e){
 			logger.error("ConsumerWorker [consumerId={}] got IndexerESNotRecoverableException - exiting ... Exception: {}", consumerId,
 					e.getMessage());
@@ -175,6 +148,39 @@ public class ConsumerWorker implements Runnable {
 				logger.warn("ConsumerWorker [consumerId={}] is shutting down ...", consumerId);
 				consumer.close();
 			}
+		}
+	}
+
+	private void addOrUpdateOrDelMessageToBatch(String processedMessage, String topic, String id) throws Exception{
+
+		com.alibaba.fastjson.JSONObject json = com.alibaba.fastjson.JSON.parseObject(processedMessage);
+		json.keySet().forEach(key -> key.toLowerCase());
+		String parentId = json.containsKey(PARENTID)? (String)json.get(PARENTID) : "";
+		String parentTableName = json.containsKey(PARENTName)? (String)json.get(PARENTName) : "";
+		String op = json.containsKey(OP)? (String) json.get(OP) : "";
+		if(StringUtils.isNotBlank(op) && op.equalsIgnoreCase(DELETE)){
+			messageHandler.deleteMessageToBatch(topic, id);
+		}
+		else if(StringUtils.isBlank(parentId)){
+			messageHandler.addMessageToBatch(processedMessage, topic, id);
+		}else{
+			JSONObject jsonMessage = new JSONObject();
+			jsonMessage.put(topic, getJsonArray(processedMessage));
+			JSONObject inputMessage = new JSONObject(jsonMessage);
+			logger.info("\ninputMessage:{}\nparentTableName:{}", inputMessage, parentTableName);
+			messageHandler.updateMessageToBatch(inputMessage.toString(), parentTableName, parentId);
+		}
+	}
+
+	private JSONArray getJsonArray(String message){
+		Object obj = JSON.parse(message);
+		JSONArray array = new JSONArray();
+
+		if(obj instanceof JSONObject){
+			array.add(obj);
+			return array;
+		}else{
+			return (JSONArray) obj;
 		}
 	}
 

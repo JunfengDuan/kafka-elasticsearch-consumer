@@ -23,13 +23,8 @@ public class SimpleMessageHandlerImpl implements IMessageHandler {
 	private ElasticSearchBatchService elasticSearchBatchService = null;
 	@Value("${esIndexName:my_index}")
 	private String indexName;
-//	@Value("${esIndexType:varnish}")
-	/*private String indexType;
+	private String routingValue = null; // we don't need routing for this simple scenario
 
-	public SimpleMessageHandlerImpl(){}
-	public SimpleMessageHandlerImpl(String indexType){
-		this.indexType = indexType;
-	}*/
 
 	@Override
 
@@ -40,17 +35,20 @@ public class SimpleMessageHandlerImpl implements IMessageHandler {
 
 	@Override
 	public void addMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception {
-//		String eventUUID = null; // we don't need a UUID for this simple scenario
-		String routingValue = null; // we don't need routing for this simple scenario		
+
 		elasticSearchBatchService.addEventToBulkRequest(
 				inputMessage, indexName, indexType, eventUUID, routingValue);
 	}
 
 	@Override
-	public void upDateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception {
-		String routingValue = null;
+	public void updateMessageToBatch(String inputMessage, String indexType, String eventUUID) throws Exception {
 		elasticSearchBatchService.updateEventToBulkRequest(
 				inputMessage, indexName, indexType, eventUUID, routingValue);
+	}
+
+	@Override
+	public void deleteMessageToBatch(String indexType, String eventUUID) throws Exception {
+		elasticSearchBatchService.deleteEventRequest(indexName, indexType, eventUUID, routingValue);
 	}
 
 	@Override

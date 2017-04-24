@@ -8,6 +8,7 @@ import javax.annotation.PreDestroy;
 
 import org.elasticsearch.action.admin.indices.alias.Alias;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
+import org.elasticsearch.action.delete.DeleteRequestBuilder;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.update.UpdateRequestBuilder;
 import org.elasticsearch.client.transport.TransportClient;
@@ -150,6 +151,10 @@ public class ElasticSearchClientService {
 
 	public UpdateRequestBuilder prepareUpdate(String indexName, String indexType, String id) {
 		return esTransportClient.prepareUpdate(indexName, indexType, id);
+	}
+
+	public DeleteRequestBuilder prepareDelete(String indexName, String indexType, String id) {
+		return esTransportClient.prepareDelete(indexName, indexType, id);
 	}
 
 	public BulkRequestBuilder prepareBulk() {

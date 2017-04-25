@@ -11,14 +11,12 @@
 	<import resource="common.xml"/>
 
     <context:component-scan base-package="org.elasticsearch.kafka.indexer.service"/>
-    <context:property-placeholder
+    <!--<context:property-placeholder
             location="file:/home/jfd/soft/kafka-elasticsearch-consumer/build/resources/main/config/kafka-es-indexer.properties"
     	    ignore-resource-not-found="true" />
-
-	<!--
-	<context:property-placeholder location="classpath:config/kafka-es-indexer.properties"
-								  ignore-resource-not-found="true" />
 -->
+	<context:property-placeholder location="classpath:config/kafka-es-indexer.properties, file:${indexer.properties}"
+								  ignore-resource-not-found="true" />
     <bean id="messageHandler"
 		  class="org.elasticsearch.kafka.indexer.service.impl.examples.SimpleMessageHandlerImpl"
 		  scope="prototype"

@@ -108,6 +108,7 @@ public class ConsumerManager {
         kafkaProperties.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, props.get(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG));
         kafkaProperties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
+        logger.info("kafkaProperties-{}",kafkaProperties.toString());
         // TODO make a dynamic property determined from the mockedKafkaCluster metadata
         consumerStartOptions = ConsumerStartOption.fromConfig((String)props.get(OPTION_CONFIG));
         determineOffsetForAllPartitionsAndSeek();

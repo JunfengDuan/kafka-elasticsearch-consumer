@@ -29,7 +29,7 @@ public class ConsumerWorker implements Runnable {
 	private static final String PARENTID = "parentId";
 	private static final String PARENTName = "parentTableName";
 	private static final String OP = "op";
-	private static final String DELETE = "delete";
+	private static final String DELETE = "es_delete";
 	private IMessageHandler messageHandler;
 	private KafkaConsumer<String, String> consumer;
 	private final List<String> kafkaTopics;

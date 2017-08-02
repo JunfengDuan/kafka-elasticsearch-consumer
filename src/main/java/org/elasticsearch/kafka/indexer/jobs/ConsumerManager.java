@@ -157,10 +157,10 @@ public class ConsumerManager {
                     kafkaConsumer.seek(topicPartition, startOption.getStartOffset());
                     break;
                 case EARLIEST:
-                    kafkaConsumer.seekToBeginning(topicPartition);
+                    kafkaConsumer.seekToBeginning(assignedTopicPartitions);
                     break;
                 case LATEST:
-                    kafkaConsumer.seekToEnd(topicPartition);
+                    kafkaConsumer.seekToEnd(assignedTopicPartitions);
                     break;
                 case RESTART:
                 default:
